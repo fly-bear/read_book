@@ -11,7 +11,7 @@
 
 ## 使用方式
 
-将 txt 格式的小说放到 books 目录下，然后执行`python3 read_book.py`
+将 txt 格式的小说放到 books 目录下，然后执行`python3 reader.py`
 
 ![img1](https://github.com/fly-bear/read_book/blob/master/imgs/Lark20200702145228.png)
 
