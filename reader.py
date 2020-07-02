@@ -1,15 +1,13 @@
 import sys
 import json
 import os
-import math
-
 
 
 last_line = '\x1b[1A'
 clear_line = '\x1B[K'
 clear_this_line = '\r' + clear_line
 clear_last_line = last_line + clear_line
-
+platform = 'unix'
 
 def scan_files(directory,prefix=None,postfix=None):
     files_list=[]
@@ -30,10 +28,13 @@ def scan_files(directory,prefix=None,postfix=None):
 
 class _Getch:
     def __init__(self):
+        global platform
         try:
             self.impl = _GetchWindows()
+            platform = 'win'
         except ImportError:
             self.impl = _GetchUnix()
+            platform = 'unix'
 
     def __call__(self): return self.impl()
 
@@ -56,6 +57,8 @@ class _GetchUnix:
 
 class _GetchWindows:
     def __init__(self):
+        import colorama
+        colorama.init()
         import msvcrt
 
     def __call__(self):
@@ -86,13 +89,17 @@ def print_context(skip, context, total, name):
     sys.stdout.write('\t ({}/{})'.format(skip + 1, total))
     sys.stdout.flush()
     ch = _getch()
+    if platform == 'win':
+        ch = ch.decode()
     while ch not in ['j','k','e','d','t','c','a','s']:
         ch = _getch()
+        if platform == 'win':
+            ch = ch.decode()
     if ch == 'j' or ch == 'a':
         skip -= 2
         jump = True
     elif ch == 'k' or ch == 's':
-    	pass
+        pass
     elif ch == 'd':
         sys.stdout.write(clear_this_line + last_line)
     elif ch == 't':
@@ -124,7 +131,8 @@ def print_context(skip, context, total, name):
 
 
 def main():
-    term_width = os.get_terminal_size().columns
+    # term_width = os.get_terminal_size().columns
+    term_width = 100
     book_list = list(map(lambda x: x.split('.txt')[0][8:], scan_files('./books', postfix='.txt')))
     print('choose a book: ')
     i = 1
