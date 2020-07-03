@@ -1,6 +1,8 @@
 import sys
 import json
 import os
+from  pynput import mouse
+import threading
 
 
 last_line = '\x1b[1A'
@@ -8,6 +10,69 @@ clear_line = '\x1B[K'
 clear_this_line = '\r' + clear_line
 clear_last_line = last_line + clear_line
 platform = 'unix'
+control = 'keyboard'
+
+
+class MouseClass():
+
+    def __init__(self):
+        # super(MouseClass, self).__init__(*args, **kwargs)
+        super().__init__()
+        self.mouse_listener = mouse.Listener()
+        self.__mouse_run_flag_ = True
+        self.__mouse_destroy_flag_ = True
+
+    def set_value(self, book=None, skip=0):
+        if book is None:
+            book = []
+        self.book = book
+        self.skip = skip
+        self.lines = book[skip]
+        self.pos = 0
+        # self.width = os.get_terminal_size().columns
+        self.width = 100
+    def get_value(self):
+        return self.skip
+
+    def on_click(self, x, y, button, pressed):
+        if button == mouse.Button.middle:
+            self.__mouse_destroy_flag_ = False
+
+    def on_scroll(self, x, y, dx, dy):
+        print('Scrolled {0}'.format(
+            (x, y)))
+        print(self.lines[self.pos] + '\n')
+        self.pos += 1
+        if self.pos >= len(self.lines):
+            self.pos = 0
+            line = self.book[self.skip].replace('\n', '')
+            lines = []
+            while len(line.encode('gbk')) > self.width:
+                offset = 0
+                try:
+                    text = line.encode('gbk')[0:self.width].decode('gbk')
+                except Exception as e:
+                    offset = 1
+                    text = line.encode('gbk')[0:self.width - offset].decode('gbk')
+                lines.append(text)
+                line = line.encode('gbk')[self.width - offset:].decode('gbk')
+            lines.append(line)
+            self.skip += 1
+        if dy < 0:
+            pass
+        elif self.pos >= 2:
+            self.pos -= 2
+        else:
+            self.skip -= 2
+        print(self.book[0])
+        if not self.__mouse_destroy_flag_:
+            return False
+
+    def run(self):
+        with mouse.Listener( on_click = self.on_click, on_scroll = self.on_scroll,
+                                  suppress= not self.__mouse_run_flag_) as self.mouse_listener:
+            self.mouse_listener.join()
+
 
 def scan_files(directory,prefix=None,postfix=None):
     files_list=[]
@@ -82,7 +147,14 @@ def get_read_his():
     return shelf, name
 
 
+def control_by_mouse(book, skip):
+    km = MouseClass(book, skip)
+    km.run()
+    print("end mouse")
+    return km.get_value()
+
 def print_context(skip, context, total, name):
+    global control
     start = False
     jump = False
     print(context + '\n')
@@ -91,7 +163,7 @@ def print_context(skip, context, total, name):
     ch = _getch()
     if platform == 'win':
         ch = ch.decode()
-    while ch not in ['j','k','e','d','t','c','a','s']:
+    while ch not in ['j', 'k', 'e', 'd', 't', 'c', 'a', 's', 'm']:
         ch = _getch()
         if platform == 'win':
             ch = ch.decode()
@@ -125,12 +197,15 @@ def print_context(skip, context, total, name):
         shelf[name] = skip
         with open('./bookshelf.txt', 'w') as f:
             f.write(json.dumps(shelf))
+    elif ch == 'm':
+        control = 'mouse'
     sys.stdout.write(clear_this_line + clear_last_line * 2)
     sys.stdout.flush()
     return jump, skip, start
 
 
 def main():
+    global control
     # term_width = os.get_terminal_size().columns
     term_width = 100
     book_list = list(map(lambda x: x.split('.txt')[0][8:], scan_files('./books', postfix='.txt')))
@@ -187,7 +262,13 @@ def main():
             except Exception as e:
                 offset = 1
                 text = line.encode('gbk')[0:term_width - offset].decode('gbk')
-            jump, skip, start = print_context(skip, text, total, name)
+            if control == 'keyboard':
+                jump, skip, start = print_context(skip, text, total, name)
+            else:
+                jump = True
+                start = False
+                skip = control_by_mouse(book, skip)
+                control = 'keyboard'
             if start:
                 return
             if jump:
