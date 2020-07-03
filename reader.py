@@ -27,7 +27,7 @@ class MouseClass():
             book = []
         self.book = book
         self.skip = skip
-        self.lines = book[skip]
+        self.lines = ['test']
         self.pos = 0
         # self.width = os.get_terminal_size().columns
         self.width = 100
@@ -39,8 +39,6 @@ class MouseClass():
             self.__mouse_destroy_flag_ = False
 
     def on_scroll(self, x, y, dx, dy):
-        print('Scrolled {0}'.format(
-            (x, y)))
         print(self.lines[self.pos] + '\n')
         self.pos += 1
         if self.pos >= len(self.lines):
@@ -50,13 +48,14 @@ class MouseClass():
             while len(line.encode('gbk')) > self.width:
                 offset = 0
                 try:
-                    text = line.encode('gbk')[0:self.width].decode('gbk')
+                    text = line.encode('gbk')[:self.width].decode('gbk')
                 except Exception as e:
                     offset = 1
-                    text = line.encode('gbk')[0:self.width - offset].decode('gbk')
+                    text = line.encode('gbk')[:self.width - offset].decode('gbk')
                 lines.append(text)
                 line = line.encode('gbk')[self.width - offset:].decode('gbk')
             lines.append(line)
+            self.lines = lines
             self.skip += 1
         if dy < 0:
             pass
@@ -64,7 +63,6 @@ class MouseClass():
             self.pos -= 2
         else:
             self.skip -= 2
-        print(self.book[0])
         if not self.__mouse_destroy_flag_:
             return False
 
@@ -148,7 +146,8 @@ def get_read_his():
 
 
 def control_by_mouse(book, skip):
-    km = MouseClass(book, skip)
+    km = MouseClass()
+    km.set_value(book, skip)
     km.run()
     print("end mouse")
     return km.get_value()
@@ -275,7 +274,13 @@ def main():
                 break
             line = line.encode('gbk')[term_width - offset:].decode('gbk')
         if not jump:
-            jump, skip, start = print_context(skip, line, total, name)
+            if control == 'keyboard':
+                jump, skip, start = print_context(skip, line, total, name)
+            else:
+                jump = True
+                start = False
+                skip = control_by_mouse(book, skip)
+                control = 'keyboard'
             if start:
                 return
         skip += 1
