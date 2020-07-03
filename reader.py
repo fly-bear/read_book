@@ -1,7 +1,6 @@
 import sys
 import json
 import os
-from  pynput import mouse
 import threading
 
 
@@ -17,6 +16,7 @@ class MouseClass():
 
     def __init__(self):
         # super(MouseClass, self).__init__(*args, **kwargs)
+        from pynput import mouse
         super().__init__()
         self.mouse_listener = mouse.Listener()
         self.__mouse_run_flag_ = True
@@ -26,47 +26,78 @@ class MouseClass():
         if book is None:
             book = []
         self.book = book
+        self.total = len(book)
         self.skip = skip
-        self.lines = ['test']
+        self.lines = []
+        self.width = os.get_terminal_size().columns
+        # self.width = 100
+        self.set_lines()
+        self.skip += 1
         self.pos = 0
-        # self.width = os.get_terminal_size().columns
-        self.width = 100
+
     def get_value(self):
         return self.skip
 
     def on_click(self, x, y, button, pressed):
-        if button == mouse.Button.middle:
+        from pynput import mouse
+        if button == mouse.Button.right:
             self.__mouse_destroy_flag_ = False
+            sys.stdout.write(clear_this_line + clear_last_line * 2)
+            sys.stdout.flush()
+            self.skip -= 1
+            return False
 
     def on_scroll(self, x, y, dx, dy):
-        print(self.lines[self.pos] + '\n')
-        self.pos += 1
-        if self.pos >= len(self.lines):
-            self.pos = 0
-            line = self.book[self.skip].replace('\n', '')
-            lines = []
-            while len(line.encode('gbk')) > self.width:
-                offset = 0
-                try:
-                    text = line.encode('gbk')[:self.width].decode('gbk')
-                except Exception as e:
-                    offset = 1
-                    text = line.encode('gbk')[:self.width - offset].decode('gbk')
-                lines.append(text)
-                line = line.encode('gbk')[self.width - offset:].decode('gbk')
-            lines.append(line)
-            self.lines = lines
-            self.skip += 1
-        if dy < 0:
-            pass
+        from pynput import mouse
+        if dy > 0:
+            if self.pos >= len(self.lines):
+                self.pos = 0
+                self.set_lines()
+                self.skip += 1
+            sys.stdout.write(clear_this_line + clear_last_line * 2)
+            print(self.lines[self.pos] + '\n')
+            sys.stdout.write('\t ({}/{})'.format(self.skip, self.total))
+            sys.stdout.flush()
+
         elif self.pos >= 2:
             self.pos -= 2
+            sys.stdout.write(clear_this_line + clear_last_line * 2)
+            print(self.lines[self.pos] + '\n')
+            sys.stdout.write('\t ({}/{})'.format(self.skip, self.total))
+            sys.stdout.flush()
         else:
             self.skip -= 2
+            self.pos = 0
+            self.set_lines(-1)
+            self.skip += 1
+            sys.stdout.write(clear_this_line + clear_last_line * 2)
+            print(self.lines[self.pos] + '\n')
+            sys.stdout.write('\t ({}/{})'.format(self.skip, self.total))
+            sys.stdout.flush()
+        self.pos += 1
         if not self.__mouse_destroy_flag_:
             return False
 
+    def set_lines(self, direct = 1):
+        line = self.book[self.skip].replace('\n', '')
+        while line == '':
+            self.skip += direct
+            line = self.book[self.skip].replace('\n', '')
+        lines = []
+        while len(line.encode('gbk')) > self.width:
+            offset = 0
+            try:
+                text = line.encode('gbk')[:self.width].decode('gbk')
+            except Exception as e:
+                offset = 1
+                text = line.encode('gbk')[:self.width - offset].decode('gbk')
+            lines.append(text)
+            line = line.encode('gbk')[self.width - offset:].decode('gbk')
+        lines.append(line)
+        self.lines = lines
+
     def run(self):
+        from pynput import mouse
         with mouse.Listener( on_click = self.on_click, on_scroll = self.on_scroll,
                                   suppress= not self.__mouse_run_flag_) as self.mouse_listener:
             self.mouse_listener.join()
@@ -205,8 +236,8 @@ def print_context(skip, context, total, name):
 
 def main():
     global control
-    # term_width = os.get_terminal_size().columns
-    term_width = 100
+    term_width = os.get_terminal_size().columns
+    # term_width = 100
     book_list = list(map(lambda x: x.split('.txt')[0][8:], scan_files('./books', postfix='.txt')))
     print('choose a book: ')
     i = 1
@@ -268,6 +299,7 @@ def main():
                 start = False
                 skip = control_by_mouse(book, skip)
                 control = 'keyboard'
+                sys.stdout.write(clear_last_line)
             if start:
                 return
             if jump:
@@ -281,6 +313,7 @@ def main():
                 start = False
                 skip = control_by_mouse(book, skip)
                 control = 'keyboard'
+                sys.stdout.write(clear_last_line)
             if start:
                 return
         skip += 1
