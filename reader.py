@@ -3,6 +3,7 @@ import json
 import os
 import threading
 import math
+from datetime import datetime
 
 
 last_line = '\x1b[1A'
@@ -24,6 +25,7 @@ class MouseClass():
         self.__mouse_destroy_flag_ = True
 
     def set_value(self, book=None, skip=0, pos=0):
+        self.click_time = 0
         if book is None:
             book = []
         self.book = book
@@ -41,12 +43,16 @@ class MouseClass():
 
     def on_click(self, x, y, button, pressed):
         from pynput import mouse
-        if button == mouse.Button.left:
-            self.__mouse_destroy_flag_ = False
-            sys.stdout.write(clear_this_line + clear_last_line * 2)
-            sys.stdout.flush()
-            self.skip -= 1
-            return False
+        if button == mouse.Button.left and pressed:
+            click_time = math.ceil(datetime.now().timestamp()*1000)
+            if click_time - self.click_time < 300:
+                self.__mouse_destroy_flag_ = False
+                sys.stdout.write(clear_this_line + clear_last_line * 2)
+                sys.stdout.flush()
+                self.skip -= 1
+                return False
+            else:
+                self.click_time = click_time
 
     def on_scroll(self, x, y, dx, dy):
         from pynput import mouse
