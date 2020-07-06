@@ -22,7 +22,7 @@ class MouseClass():
         self.__mouse_run_flag_ = True
         self.__mouse_destroy_flag_ = True
 
-    def set_value(self, book=None, skip=0):
+    def set_value(self, book=None, skip=0, pos=0):
         if book is None:
             book = []
         self.book = book
@@ -33,10 +33,10 @@ class MouseClass():
         # self.width = 100
         self.set_lines()
         self.skip += 1
-        self.pos = 0
+        self.pos = pos
 
     def get_value(self):
-        return self.skip
+        return self.skip, self.pos
 
     def on_click(self, x, y, button, pressed):
         from pynput import mouse
@@ -54,26 +54,17 @@ class MouseClass():
                 self.pos = 0
                 self.set_lines()
                 self.skip += 1
-            sys.stdout.write(clear_this_line + clear_last_line * 2)
-            print(self.lines[self.pos] + '\n')
-            sys.stdout.write('\t ({}/{})'.format(self.skip, self.total))
-            sys.stdout.flush()
-
         elif self.pos >= 2:
             self.pos -= 2
-            sys.stdout.write(clear_this_line + clear_last_line * 2)
-            print(self.lines[self.pos] + '\n')
-            sys.stdout.write('\t ({}/{})'.format(self.skip, self.total))
-            sys.stdout.flush()
         else:
             self.skip -= 2
-            self.pos = 0
             self.set_lines(-1)
+            self.pos = len(self.lines) - 1
             self.skip += 1
-            sys.stdout.write(clear_this_line + clear_last_line * 2)
-            print(self.lines[self.pos] + '\n')
-            sys.stdout.write('\t ({}/{})'.format(self.skip, self.total))
-            sys.stdout.flush()
+        sys.stdout.write(clear_this_line + clear_last_line * 2)
+        print(self.lines[self.pos] + '\n')
+        sys.stdout.write('\t ({}/{})'.format(self.skip, self.total))
+        sys.stdout.flush()
         self.pos += 1
         if not self.__mouse_destroy_flag_:
             return False
@@ -176,63 +167,95 @@ def get_read_his():
     return shelf, name
 
 
-def control_by_mouse(book, skip):
+def control_by_mouse(book, skip, pos):
     km = MouseClass()
-    km.set_value(book, skip)
+    km.set_value(book, skip, pos)
     km.run()
-    print("end mouse")
     return km.get_value()
 
-def print_context(skip, context, total, name):
+def print_context(skip, context, total, name, direct=1, pos = 0):
     global control
     start = False
-    jump = False
-    print(context + '\n')
+    lines = []
+    term_width = os.get_terminal_size().columns
+    while len(context.encode('gbk')) > term_width:
+        offset = 0
+        try:
+            text = context.encode('gbk')[:term_width].decode('gbk')
+        except Exception as e:
+            offset = 1
+            text = context.encode('gbk')[:term_width - offset].decode('gbk')
+        lines.append(text)
+        context = context.encode('gbk')[term_width - offset:].decode('gbk')
+    lines.append(context)
+    if direct == 1:
+        pos = 0
+    elif direct == -1:
+        pos = len(lines) - 1
+    print(lines[pos] + '\n')
+    pos += 1
     sys.stdout.write('\t ({}/{})'.format(skip + 1, total))
     sys.stdout.flush()
-    ch = _getch()
-    if platform == 'win':
-        ch = ch.decode()
-    while ch not in ['j', 'k', 'e', 'd', 't', 'c', 'a', 's', 'm']:
+    while pos <= len(lines):
         ch = _getch()
         if platform == 'win':
             ch = ch.decode()
-    if ch == 'j' or ch == 'a':
-        skip -= 2
-        jump = True
-    elif ch == 'k' or ch == 's':
-        pass
-    elif ch == 'd':
-        sys.stdout.write(clear_this_line + last_line)
-    elif ch == 't':
-        try:
-            skip = int(input("\n index: "))
+        while ch not in ['j', 'k', 'e', 'd', 't', 'c', 'a', 's', 'm']:
+            ch = _getch()
+            if platform == 'win':
+                ch = ch.decode()
+        if ch == 'm':
+            direct = 1
+            control = 'mouse'
+            return skip, start, direct, pos
+        sys.stdout.write(clear_this_line + clear_last_line * 2)
+        if ch == 'j' or ch == 'a':
+            direct = -1
+            if pos < 2:
+                skip -= 2
+                break
+            else:
+                pos -= 2
+                print(lines[pos] + '\n')
+                sys.stdout.write('\t ({}/{})'.format(skip + 1, total))
+                sys.stdout.flush()
+                pos += 1
+        elif ch == 'k' or ch == 's':
+            direct = 1
+            if pos == len(lines):
+                break
+            print(lines[pos] + '\n')
+            sys.stdout.write('\t ({}/{})'.format(skip + 1, total))
+            sys.stdout.flush()
+            pos += 1
+        elif ch == 'd':
+            sys.stdout.write(clear_this_line + last_line)
+        elif ch == 't':
+            direct = 1
+            try:
+                skip = int(input("\n index: "))
+                skip -= 1
+            except Exception as e:
+                print("not a valid num")
+                sys.stdout.write(clear_this_line + clear_last_line)
+            sys.stdout.write(clear_this_line + clear_last_line + last_line)
             skip -= 1
-        except Exception as e:
-            print("not a valid num")
-            sys.stdout.write(clear_this_line + clear_last_line)
-        sys.stdout.write(clear_this_line + clear_last_line + last_line)
-        skip -= 1
-        jump = True
-    elif ch == 'e':
-        sys.stdout.write(clear_this_line + clear_last_line * 3)
-        shelf['lastbook'] = name
-        shelf[name] = skip
-        with open('./bookshelf.txt', 'w') as f:
-            f.write(json.dumps(shelf))
-        exit(0)
-    elif ch == 'c':
-        start = True
-        shelf['lastbook'] = name
-        shelf[name] = skip
-        with open('./bookshelf.txt', 'w') as f:
-            f.write(json.dumps(shelf))
-    elif ch == 'm':
-        control = 'mouse'
-        return jump, skip, start
-    sys.stdout.write(clear_this_line + clear_last_line * 2)
-    sys.stdout.flush()
-    return jump, skip, start
+            break
+        elif ch == 'e':
+            sys.stdout.write(clear_this_line + clear_last_line * 3)
+            shelf['lastbook'] = name
+            shelf[name] = skip
+            with open('./bookshelf.txt', 'w') as f:
+                f.write(json.dumps(shelf))
+            exit(0)
+        elif ch == 'c':
+            start = True
+            shelf['lastbook'] = name
+            shelf[name] = skip
+            with open('./bookshelf.txt', 'w') as f:
+                f.write(json.dumps(shelf))
+            break
+    return skip, start, direct, pos
 
 
 def main():
@@ -276,47 +299,25 @@ def main():
         with open('./books/' + name + '.txt', 'r', encoding='gbk') as f:
             book = f.readlines()
     total = len(book)
-    jump = False
+    direct = 1
+    pos = 0
     while skip < total:
         line = book[skip].replace('\n', '')
-        if line == '' and not jump:
-            skip += 1
+        if line == '':
+            skip += direct
             continue
-        elif line == '' and jump:
+        if control == 'keyboard':
+            skip, start, direct, pos = print_context(skip, line, total, name, direct, pos)
+        else:
+            start = False
+            skip -= 2
+            skip, pos = control_by_mouse(book, skip, pos)
+            direct = 0
+            control = 'keyboard'
+            pos -= 1
             skip -= 1
-            continue
-        jump = False
-        while len(line.encode('gbk')) > term_width:
-            offset = 0
-            try:
-                text = line.encode('gbk')[0:term_width].decode('gbk')
-            except Exception as e:
-                offset = 1
-                text = line.encode('gbk')[0:term_width - offset].decode('gbk')
-            if control == 'keyboard':
-                jump, skip, start = print_context(skip, text, total, name)
-            else:
-                jump = True
-                start = False
-                skip = control_by_mouse(book, skip)
-                control = 'keyboard'
-                sys.stdout.write(clear_last_line)
-            if start:
-                return
-            if jump:
-                break
-            line = line.encode('gbk')[term_width - offset:].decode('gbk')
-        if not jump:
-            if control == 'keyboard':
-                jump, skip, start = print_context(skip, line, total, name)
-            else:
-                jump = True
-                start = False
-                skip = control_by_mouse(book, skip)
-                control = 'keyboard'
-                sys.stdout.write(clear_last_line)
-            if start:
-                return
+        if start:
+            return
         skip += 1
 
 
