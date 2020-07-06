@@ -2,6 +2,7 @@ import sys
 import json
 import os
 import threading
+import math
 
 
 last_line = '\x1b[1A'
@@ -63,7 +64,7 @@ class MouseClass():
             self.skip += 1
         sys.stdout.write(clear_this_line + clear_last_line * 2)
         print(self.lines[self.pos] + '\n')
-        sys.stdout.write('\t ({}/{})'.format(self.skip, self.total))
+        sys.stdout.write('\t ({}/{})({:.2f}%)'.format(self.skip, self.total, (self.skip)/self.total*100))
         sys.stdout.flush()
         self.pos += 1
         if not self.__mouse_destroy_flag_:
@@ -194,7 +195,7 @@ def print_context(skip, context, total, name, direct=1, pos = 0):
         pos = len(lines) - 1
     print(lines[pos] + '\n')
     pos += 1
-    sys.stdout.write('\t ({}/{})'.format(skip + 1, total))
+    sys.stdout.write('\t ({}/{})({:.2f}%)'.format(skip + 1, total, (skip+1)/total*100))
     sys.stdout.flush()
     while pos <= len(lines):
         ch = _getch()
@@ -217,7 +218,7 @@ def print_context(skip, context, total, name, direct=1, pos = 0):
             else:
                 pos -= 2
                 print(lines[pos] + '\n')
-                sys.stdout.write('\t ({}/{})'.format(skip + 1, total))
+                sys.stdout.write('\t ({}/{})({:.2f}%)'.format(skip + 1, total, (skip+1)/total*100))
                 sys.stdout.flush()
                 pos += 1
         elif ch == 'k' or ch == 's':
@@ -225,7 +226,7 @@ def print_context(skip, context, total, name, direct=1, pos = 0):
             if pos == len(lines):
                 break
             print(lines[pos] + '\n')
-            sys.stdout.write('\t ({}/{})'.format(skip + 1, total))
+            sys.stdout.write('\t ({}/{})({:.2f}%)'.format(skip + 1, total, (skip+1)/total*100))
             sys.stdout.flush()
             pos += 1
         elif ch == 'd':
