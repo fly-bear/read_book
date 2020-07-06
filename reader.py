@@ -40,7 +40,7 @@ class MouseClass():
 
     def on_click(self, x, y, button, pressed):
         from pynput import mouse
-        if button == mouse.Button.right:
+        if button == mouse.Button.left:
             self.__mouse_destroy_flag_ = False
             sys.stdout.write(clear_this_line + clear_last_line * 2)
             sys.stdout.flush()
@@ -229,6 +229,7 @@ def print_context(skip, context, total, name):
             f.write(json.dumps(shelf))
     elif ch == 'm':
         control = 'mouse'
+        return jump, skip, start
     sys.stdout.write(clear_this_line + clear_last_line * 2)
     sys.stdout.flush()
     return jump, skip, start
