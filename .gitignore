@@ -1,3 +1,5 @@
 .DS_Store
 bookshelf.txt
 /books/*.temp
+.idea/
+__pycache__/

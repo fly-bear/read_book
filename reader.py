@@ -1,7 +1,6 @@
 import sys
 import json
 import os
-import threading
 import math
 from datetime import datetime
 
@@ -12,6 +11,7 @@ clear_this_line = '\r' + clear_line
 clear_last_line = last_line + clear_line
 platform = 'unix'
 control = 'keyboard'
+source = 'local'
 
 
 class MouseClass():
@@ -101,6 +101,79 @@ class MouseClass():
             self.mouse_listener.join()
 
 
+def get_review(book_id, chapter_id, seg_id):
+    import request_qidian as qd
+    return qd.get_reviews(book_id=book_id, chapter_id=chapter_id, segment_id=seg_id)
+
+
+def request_qidian():
+    import request_qidian as qd
+    global source
+    source = 'qidian'
+    shelf = {}
+    with open('./bookshelf.txt', 'r') as f:
+        shelf = json.loads(f.read())
+    # book_id = 1010868264
+    chap_id = -1
+    last = -1
+    choice = -1
+    book_name = ''
+    book_id = -1
+    if shelf.__contains__('qidian'):
+        books = list(shelf['qidian'].keys())
+        if len(books) > 0:
+            index = 1
+            for book in books:
+                print("{}. {}".format(index, book))
+                index += 1
+            get = input("choose a num: ")
+            sys.stdout.write(clear_last_line * (len(books) + 1))
+            sys.stdout.flush()
+            if get == '':
+                choice = -1
+            else:
+                choice = int(get)-1
+                book_name = books[choice]
+                book_id = shelf['qidian'][book_name]['book_id']
+                chap_id = shelf['qidian'][book_name]['chapter_id']
+                last = shelf['qidian'][book_name]['skip']
+    if choice == -1:
+        book_name = input("book name: ")
+        book_id = input("book_id: ")
+        sys.stdout.write(clear_last_line * 2)
+        sys.stdout.flush()
+    index = 0
+    ids = qd.get_chapter_ids(book_id=book_id)
+    while index < len(ids):
+        if index < 0:
+            index = 0
+        chapter_id = ids[index] # chapter_id: [[id, name], [id, name], ...]
+        index += 1
+        if chap_id != -1 and chap_id != chapter_id[0]:
+            continue
+        chap_id = -1
+        lines = qd.get_chapter(book_id=book_id, chapter_id=chapter_id[0])
+        lines.insert(0, chapter_id[1])
+        if last == -1:
+            skip = 0
+        else:
+            skip = last
+            last = -1
+        while skip < len(lines):
+            text = lines[skip].replace('\n', '')
+            if text == '':
+                skip += 1
+                continue
+            skip, start, direct, pos, nextt = print_context(shelf=shelf, skip=skip, context=lines[skip], total=len(lines),
+                                                     name=book_name, pos=0, book_id=book_id, chapter_id=chapter_id[0])
+            if nextt and direct == 1:
+                break
+            elif nextt and direct == -1:
+                index -= 2
+                break
+            skip += 1
+
+
 def scan_files(directory,prefix=None,postfix=None):
     files_list=[]
     
@@ -180,9 +253,11 @@ def control_by_mouse(book, skip, pos):
     km.run()
     return km.get_value()
 
-def print_context(skip, context, total, name, direct=1, pos = 0):
-    global control
+
+def print_context(shelf, skip, context, total, name, direct=1, pos = 0, book_id=0, chapter_id=0):
+    global control, source
     start = False
+    nextt = False
     lines = []
     term_width = os.get_terminal_size().columns
     while len(context.encode('gbk')) > term_width:
@@ -207,14 +282,19 @@ def print_context(skip, context, total, name, direct=1, pos = 0):
         ch = _getch()
         if platform == 'win':
             ch = ch.decode()
-        while ch not in ['j', 'k', 'e', 'd', 't', 'c', 'a', 's', 'm']:
+        while ch not in ['j', 'k', 'e', 'd', 't', 'c', 'a', 's', 'm', 'r', 'n', 'l']:
             ch = _getch()
             if platform == 'win':
                 ch = ch.decode()
         if ch == 'm':
             direct = 1
             control = 'mouse'
-            return skip, start, direct, pos
+            return skip, start, direct, pos, nextt
+        elif ch =='r':
+            if source == 'qidian' and skip > 0:
+                reviews = get_review(book_id=book_id, chapter_id=chapter_id, seg_id=skip)
+                show_reviews(reviews)
+            continue
         sys.stdout.write(clear_this_line + clear_last_line * 2)
         if ch == 'j' or ch == 'a':
             direct = -1
@@ -249,25 +329,101 @@ def print_context(skip, context, total, name, direct=1, pos = 0):
             skip -= 1
             break
         elif ch == 'e':
-            sys.stdout.write(clear_this_line + clear_last_line * 3)
-            shelf['lastbook'] = name
-            shelf[name] = skip
-            with open('./bookshelf.txt', 'w') as f:
-                f.write(json.dumps(shelf))
+            save_shelf(shelf, name, skip, source, book_id, chapter_id)
             exit(0)
         elif ch == 'c':
             start = True
-            shelf['lastbook'] = name
-            shelf[name] = skip
-            with open('./bookshelf.txt', 'w') as f:
-                f.write(json.dumps(shelf))
+            save_shelf(shelf, name, skip, source, book_id, chapter_id)
             break
-    return skip, start, direct, pos
+        elif ch == 'n':
+            nextt = True
+            direct = 1
+            break
+        elif ch == 'l':
+            nextt = True
+            direct = -1
+            break
+    return skip, start, direct, pos, nextt
+
+
+def show_reviews(reviews):
+    if len(reviews) == 0:
+        return
+    print('\n' + reviews[0])
+    index = 1
+    review = reviews[0]
+    while len(review)>0 and review[-1] == '\n':
+        review = review[:-1]
+    lines = count_lines(review)
+    while index < len(reviews):
+        if index < 0:
+            index = 0
+        ch = _getch()
+        if platform == 'win':
+            ch = ch.decode()
+        while ch not in ['a', 's', 'j', 'k', 'e', 'd']:
+            ch = _getch()
+            if platform == 'win':
+                ch = ch.decode()
+        if ch == 'd':
+            sys.stdout.write(clear_last_line)
+            sys.stdout.flush()
+            continue
+        sys.stdout.write(clear_last_line * lines)
+        if ch == 'e':
+            sys.stdout.write(last_line)
+            sys.stdout.flush()
+            return
+        elif ch == 'j' or ch == 'a':
+            index -= 2
+            if index < 0:
+                index = 0
+            review = reviews[index]
+            index += 1
+            while len(review)>0 and review[-1] == '\n':
+                review = review[:-1]
+            print(review)
+            lines = count_lines(review)
+        elif ch == 'k' or ch == 's':
+            review = reviews[index]
+            index += 1
+            while len(review)>0 and review[-1] == '\n':
+                review = review[:-1]
+            print(review)
+            lines = count_lines(review)
+
+    sys.stdout.write(clear_last_line * lines + last_line)
+    sys.stdout.flush()
+
+
+def count_lines(text):
+    count = 0
+    lines = text.split('\n')
+    count += len(lines)
+    width = os.get_terminal_size().columns
+    for line in lines:
+        try:
+            count += (len(line.encode('gbk')) - 1) // width
+        except Exception as e:
+            pass
+    return count
+
+
+def save_shelf(shelf, name, skip, source, book_id = 0, chapter_id=0):
+    if source == 'local':
+        shelf['lastbook'] = name
+        shelf[name] = skip
+    elif shelf.__contains__("qidian"):
+        shelf['qidian'][name] = {'book_id':book_id, 'chapter_id':chapter_id, 'skip': skip}
+    else:
+        shelf['qidian'] = {}
+        shelf['qidian'][name] = {'book_id':book_id, 'chapter_id':chapter_id, 'skip': skip}
+    with open('./bookshelf.txt', 'w') as f:
+        f.write(json.dumps(shelf))
 
 
 def main():
     global control
-    term_width = os.get_terminal_size().columns
     # term_width = 100
     book_list = list(map(lambda x: x.split('.txt')[0][8:], scan_files('./books', postfix='.txt')))
     print('choose a book: ')
@@ -314,7 +470,7 @@ def main():
             skip += direct
             continue
         if control == 'keyboard':
-            skip, start, direct, pos = print_context(skip, line, total, name, direct, pos)
+            skip, start, direct, pos, nextt = print_context(shelf, skip, line, total, name, direct, pos)
         else:
             start = False
             skip -= 2
@@ -329,7 +485,11 @@ def main():
 
 
 if __name__=='__main__':
-    while True:
-        shelf, last_book = get_read_his()
-        main()
+    args = sys.argv
+    if len(args) > 1 and args[1] == 'qidian':
+        request_qidian()
+    else:
+        while True:
+            shelf, last_book = get_read_his()
+            main()
 
