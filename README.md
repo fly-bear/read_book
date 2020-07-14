@@ -57,15 +57,30 @@
 若向上滚动时带动了页面，可按住 `shift` 再滚动
 
 ### 2. 起点在线阅读（试用阶段， 需一定开发知识）
-首先网页登录起点，按 f12 打开开发者工具，选择network选项卡，随便操作一下网页（比如进入书架），在请求中头获取cookies，复制，填入request_qidian.py文件的第 5 行
+首先网页登录起点，按 f12 打开开发者工具，选择network选项卡，随便操作一下网页（比如进入书架），在请求中头获取_csrfToken 和 cookie，复制，填入request_qidian.py文件的第3行和第5行
+
+![img3](https://github.com/fly-bear/read_book/blob/master/imgs/Lark20200714153917.png)
 
 点进想看的书的主页，在 url 地址中复制书籍数字 id
 
+![img4](https://github.com/fly-bear/read_book/blob/master/imgs/Lark20200714153404.png)
+
 执行`python3 reader.py qidian`，会出现和本地阅读一样的选择书籍，如果阅读新书，直接按回车，输入书名和id，就可以开始阅读了
 
-键盘操作和本地模式相同，若想要看当前段落的评论，按`r`键进入
+![img5](https://github.com/fly-bear/read_book/blob/master/imgs/Lark20200714153036.png)
+![img6](https://github.com/fly-bear/read_book/blob/master/imgs/Lark20200714153130.png)
+
+键盘基本操作和本地模式相同
+
+`j`和`a`上一行， `k`和`s`下一行，`t`跳转指定行（本章内），`e`退出
+
+按`l`跳转上一章，按`n`跳转下一章
+
+若想要看当前段落的评论，按`r`键进入
 
 评论最多获取 50 条，同样使用'j'和'k'进行上下翻页，阅读完毕自动退出，或者按'e'退出，回到书籍阅读
+
+![img7](https://github.com/fly-bear/read_book/blob/master/imgs/Lark20200714153459.png)
 
 
 
