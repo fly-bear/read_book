@@ -57,7 +57,7 @@
 若向上滚动时带动了页面，可按住 `shift` 再滚动
 
 ### 2. 起点在线阅读（试用阶段， 需一定开发知识）
-首先网页登录起点，按 f12 打开开发者工具，选择network选项卡，随便操作一下网页（比如进入书架），在请求中头获取_csrfToken 和 cookie，复制，填入request_qidian.py文件的第3行和第5行
+首先网页登录起点，按 f12 打开开发者工具，选择network选项卡，随便操作一下网页（比如进入目录），在请求中头获取_csrfToken 和 cookie，复制，填入request_qidian.py文件的第3行和第5行
 
 ![img3](https://github.com/fly-bear/read_book/blob/master/imgs/Lark20200714153917.png)
 
