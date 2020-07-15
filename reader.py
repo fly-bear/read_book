@@ -101,6 +101,169 @@ class MouseClass():
             self.mouse_listener.join()
 
 
+class qidianMouseClass():
+
+    def __init__(self):
+        from pynput import mouse
+        super().__init__()
+        self.mouse_listener = mouse.Listener()
+        self.__mouse_run_flag_ = True
+        self.__mouse_destroy_flag_ = True
+        self.mode = 'content'
+        self.width = os.get_terminal_size().columns
+        self.direct = 1
+        self.reviews = []
+        self.review_pos = 0
+        self.review_lines = 0
+        self.click_time = 0
+        self.nextt = False
+
+    def set_value(self, chapter, skip, book_id, chapter_id, pos):
+        self.chapter = chapter
+        self.skip = skip
+        self.book_id = book_id
+        self.chapter_id = chapter_id
+        self.pos = pos
+        self.set_lines()
+        self.skip += 1
+        self.pos = pos
+        self.total = len(chapter)
+
+    def get_value(self):
+        return self.skip, self.direct, self.pos, self.nextt
+
+    def on_click(self, x, y, button, pressed):
+        from pynput import mouse
+        if button == mouse.Button.left and pressed:
+            click_time = math.ceil(datetime.now().timestamp() * 1000)
+            if click_time - self.click_time < 300:
+                if self.mode == 'review':
+                    sys.stdout.write(clear_last_line * self.review_lines + last_line)
+                    sys.stdout.flush()
+                    self.mode = 'content'
+                else:
+                    self.__mouse_destroy_flag_ = False
+                    sys.stdout.write(clear_this_line + clear_last_line * 2)
+                    sys.stdout.flush()
+                    self.skip -= 2 if self.skip >0 else -1
+                    self.direct = 0
+                    return False
+            else:
+                self.click_time = click_time
+        elif button == mouse.Button.right and pressed and self.mode == 'content':
+            self.reviews = get_review(book_id=self.book_id, chapter_id=self.chapter_id, seg_id=self.skip - 1)
+            if len(self.reviews) > 0:
+                self.mode = 'review'
+                review = self.reviews[0]
+                while len(review) > 0 and review[-1] == '\n':
+                    review = review[:-1]
+                print('\n' + review)
+                self.review_pos = 1
+                self.review_lines = count_lines(review)
+
+    def on_scroll(self, x, y, dx, dy):
+        if self.mode == 'content':
+            if not self.read_content(dy):
+                self.nextt = True
+                return False
+        else:
+            if not self.read_review(dy):
+                sys.stdout.write(clear_last_line * self.review_lines + last_line)
+                sys.stdout.flush()
+                self.mode = 'content'
+
+
+    def read_content(self, dy):
+        if dy > 0:
+            if self.pos >= len(self.lines):
+                if self.skip >= len(self.chapter):
+                    # sys.stdout.write(clear_this_line + clear_last_line * 2)
+                    sys.stdout.flush()
+                    return False
+                self.pos = 0
+                self.set_lines()
+                self.skip += 1
+        elif self.pos >= 2:
+            self.pos -= 2
+        elif self.skip >= 2:
+            self.skip -= 2
+            self.set_lines(-1)
+            self.pos = len(self.lines) - 1
+            self.skip += 1
+        else:
+            self.skip = 0
+            self.set_lines(-1)
+            self.pos = len(self.lines) - 1
+            self.skip += 1
+        sys.stdout.write(clear_this_line + clear_last_line * 2)
+        print(self.lines[self.pos] + '\n')
+        sys.stdout.write('\t ({}/{})({:.2f}%)'.format(self.skip, self.total, (self.skip) / self.total * 100))
+        sys.stdout.flush()
+        self.pos += 1
+        return True
+
+    def read_review(self, dy):
+        if dy > 0:
+            if self.review_pos >= len(self.reviews):
+                return False
+            sys.stdout.write(clear_last_line * self.review_lines)
+            sys.stdout.flush()
+            review = self.reviews[self.review_pos]
+            while len(review) > 0 and review[-1] == '\n':
+                review = review[:-1]
+            print(review)
+            self.review_pos += 1
+            self.review_lines = count_lines(review)
+        elif self.review_pos >= 2:
+            pos = self.review_pos - 2
+            review = self.reviews[pos]
+            while len(review) > 0 and review[-1] == '\n':
+                review = review[:-1]
+            sys.stdout.write(clear_last_line * self.review_lines)
+            sys.stdout.flush()
+            print(review)
+            self.review_pos -= 1
+            self.review_lines = count_lines(review)
+        else:
+            review = self.reviews[0]
+            while len(review) > 0 and review[-1] == '\n':
+                review = review[:-1]
+            sys.stdout.write(clear_last_line * self.review_lines)
+            sys.stdout.flush()
+            print(review)
+            self.review_pos = 0
+            self.review_lines = count_lines(review)
+        return True
+
+    def set_lines(self, direct = 1):
+        line = self.chapter[self.skip].replace('\n', '')
+        while line == '':
+            self.skip += direct
+            if self.skip >= len(self.chapter):
+                return
+            elif self.skip < 0:
+                self.skip = 0
+            line = self.chapter[self.skip].replace('\n', '')
+        lines = []
+        while len(line.encode('gbk')) > self.width:
+            offset = 0
+            try:
+                text = line.encode('gbk')[:self.width].decode('gbk')
+            except Exception as e:
+                offset = 1
+                text = line.encode('gbk')[:self.width - offset].decode('gbk')
+            lines.append(text)
+            line = line.encode('gbk')[self.width - offset:].decode('gbk')
+        lines.append(line)
+        self.lines = lines
+
+    def run(self):
+        from pynput import mouse
+        with mouse.Listener( on_click = self.on_click, on_scroll = self.on_scroll,
+                                  suppress= not self.__mouse_run_flag_) as self.mouse_listener:
+            self.mouse_listener.join()
+
+
 def get_review(book_id, chapter_id, seg_id):
     import request_qidian as qd
     return qd.get_reviews(book_id=book_id, chapter_id=chapter_id, segment_id=seg_id)
@@ -108,7 +271,7 @@ def get_review(book_id, chapter_id, seg_id):
 
 def request_qidian():
     import request_qidian as qd
-    global source
+    global source, control
     source = 'qidian'
     shelf = {}
     with open('./bookshelf.txt', 'r') as f:
@@ -159,13 +322,19 @@ def request_qidian():
         else:
             skip = last
             last = -1
+        pos = 0
         while skip < len(lines):
             text = lines[skip].replace('\n', '')
             if text == '':
                 skip += 1
                 continue
-            skip, start, direct, pos, nextt = print_context(shelf=shelf, skip=skip, context=lines[skip], total=len(lines),
+            if control == 'keyboard':
+                skip, start, direct, pos, nextt = print_context(shelf=shelf, skip=skip, context=lines[skip], total=len(lines),
                                                      name=book_name, pos=0, book_id=book_id, chapter_id=chapter_id[0])
+            else:
+                skip, direct, pos, nextt = control_by_mouse_qidian(lines, skip, book_id, chapter_id[0], pos)
+                if not nextt:
+                    control = 'keyboard'
             if nextt and direct == 1:
                 break
             elif nextt and direct == -1:
@@ -245,6 +414,13 @@ def get_read_his():
     if shelf.__contains__('lastbook'):
         name = shelf['lastbook']
     return shelf, name
+
+
+def control_by_mouse_qidian(chapter, skip, book_id, chapter_id, pos):
+    km = qidianMouseClass()
+    km.set_value(chapter, skip, book_id, chapter_id, pos)
+    km.run()
+    return km.get_value()
 
 
 def control_by_mouse(book, skip, pos):
